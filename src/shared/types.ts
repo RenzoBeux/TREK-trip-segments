@@ -176,3 +176,19 @@ export function coerceTintMode(value: unknown): TintMode {
     ? value
     : DEFAULT_TINT_MODE;
 }
+
+/**
+ * What the map line of each leg follows, chosen per user in plugin settings.
+ *
+ * `with-stays` threads each night's accommodation in after that day's stops, so a
+ * leg based in one city with day trips out of it reads as spokes from the hotel
+ * rather than a zig-zag between the day trips. `off` removes the layer entirely.
+ */
+export type MapLineMode = 'with-stays' | 'stops-only' | 'off';
+
+export const DEFAULT_MAP_LINE_MODE: MapLineMode = 'with-stays';
+
+/** Same distrust as coerceTintMode: anything unrecognised gets the default. */
+export function coerceMapLineMode(value: unknown): MapLineMode {
+  return value === 'with-stays' || value === 'stops-only' || value === 'off' ? value : DEFAULT_MAP_LINE_MODE;
+}

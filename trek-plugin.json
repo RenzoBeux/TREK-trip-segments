@@ -46,6 +46,27 @@
           "label": "No tint (also hides the leg-name tooltip)"
         }
       ]
+    },
+    {
+      "key": "mapLines",
+      "label": "Map lines",
+      "input_type": "select",
+      "scope": "user",
+      "hint": "What each leg's line on the trip map connects. Applies next time you open a trip.",
+      "options": [
+        {
+          "value": "with-stays",
+          "label": "Stops and each night's stay"
+        },
+        {
+          "value": "stops-only",
+          "label": "Planned stops only"
+        },
+        {
+          "value": "off",
+          "label": "No lines"
+        }
+      ]
     }
   ],
   "permissions": [

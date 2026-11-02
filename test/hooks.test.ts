@@ -3,14 +3,14 @@ import { buildDayIndex, resolveAll } from '../src/shared/drift';
 import { allocateBudget, cleanPath, decimate, isFiniteLatLng } from '../src/server/geometry';
 import { buildItems } from '../src/server/hooks/day-schedule';
 import { buildTints } from '../src/server/hooks/day-tint';
-import { buildFeatures } from '../src/server/hooks/map-layer';
+import { buildFeatures, buildNightStops } from '../src/server/hooks/map-layer';
 import { buildSections } from '../src/server/hooks/pdf-section';
 import { countsForSegment } from '../src/shared/filter';
 import { buildCards } from '../src/server/hooks/trip-card';
 import { MAX_SEGMENTS_PER_TRIP } from '../src/shared/limits';
-import type { HostDay } from '../src/shared/host-types';
+import type { HostAccommodation, HostDay } from '../src/shared/host-types';
 import type { Point } from '../src/server/geometry';
-import { DEFAULT_TINT_MODE, coerceTintMode } from '../src/shared/types';
+import { DEFAULT_MAP_LINE_MODE, DEFAULT_TINT_MODE, coerceMapLineMode, coerceTintMode } from '../src/shared/types';
 import type { SegmentRow } from '../src/shared/types';
 
 /** Host caps, restated here so a test failure names the real limit. */
@@ -249,6 +249,108 @@ describe('mapLayerProvider', () => {
 
   it('uses one layer, well inside the four-layer cap', () => {
     expect(1).toBeLessThanOrEqual(HOST_MAX_LAYERS);
+  });
+});
+
+describe('map lines through stays (#6)', () => {
+  const HOTEL: [number, number] = [35.5, 24.0];
+
+  const stay = (id: number, startDayId: number, endDayId: number, at: [number, number] = HOTEL): HostAccommodation => ({
+    id,
+    trip_id: 1,
+    start_day_id: startDayId,
+    end_day_id: endDayId,
+    place_lat: at[0],
+    place_lng: at[1],
+  });
+
+  it('covers every night up to, but not including, the check-out day', () => {
+    const idx = buildDayIndex(daysWithStops(6, 0));
+    const nights = buildNightStops([stay(1, 1001, 1004)], idx); // positions 2..5
+
+    expect([...nights.keys()]).toEqual([2, 3, 4]);
+  });
+
+  it('counts a same-day stay for its one day', () => {
+    const idx = buildDayIndex(daysWithStops(3, 0));
+    expect([...buildNightStops([stay(1, 1001, 1001)], idx).keys()]).toEqual([2]);
+  });
+
+  it('lets the earlier stay win a doubly-booked night, whatever the row order', () => {
+    const idx = buildDayIndex(daysWithStops(5, 0));
+    const early = stay(1, 1000, 1003, [10, 10]);
+    const late = stay(2, 1002, 1004, [20, 20]);
+
+    for (const rows of [[early, late], [late, early]]) {
+      const nights = buildNightStops(rows, idx);
+      expect(nights.get(3)).toEqual([10, 10]); // both cover it; the earlier start wins
+      expect(nights.get(4)).toEqual([20, 20]); // the earlier one has checked out
+    }
+  });
+
+  it('ignores a stay with no usable coordinates or off the timeline', () => {
+    const idx = buildDayIndex(daysWithStops(3, 0));
+    const unplaced = { ...stay(1, 1000, 1002), place_lat: null, place_lng: null };
+    const elsewhere = stay(2, 9000, 9001);
+
+    expect(buildNightStops([unplaced, elsewhere], idx).size).toBe(0);
+  });
+
+  it('collapses the duplicate rows a stay with two bookings comes back as', () => {
+    const idx = buildDayIndex(daysWithStops(3, 0));
+    const a = { ...stay(1, 1000, 1002), reservation_title: 'A' };
+    const b = { ...a, reservation_title: 'B' };
+
+    expect([...buildNightStops([a, b], idx).keys()]).toEqual([1, 2]);
+  });
+
+  it('returns to the stay at the end of each day of the leg', () => {
+    const days = daysWithStops(3, 2);
+    const idx = buildDayIndex(days);
+    const nights = buildNightStops([stay(1, 1000, 1002)], idx); // nights after days 1 and 2
+
+    const [feature] = buildFeatures(resolveAll([row(1, 1, 3)], idx), days, nights);
+    const points = feature?.points ?? [];
+
+    // 2 stops + hotel, 2 stops + hotel, 2 stops (checked out on day 3).
+    expect(points).toHaveLength(8);
+    expect(points[2]).toEqual(HOTEL);
+    expect(points[5]).toEqual(HOTEL);
+    expect(points[7]).not.toEqual(HOTEL);
+  });
+
+  it('does not draw the stay twice when it is already the last stop of the day', () => {
+    const days = daysWithStops(2, 1);
+    days[0]!.assignments!.push({ id: 99, day_id: 1000, place_id: 99, order_index: 1, place: { id: 99, name: 'Hotel', lat: HOTEL[0], lng: HOTEL[1] } });
+    const idx = buildDayIndex(days);
+
+    const [feature] = buildFeatures(resolveAll([row(1, 1, 2)], idx), days, buildNightStops([stay(1, 1000, 1001)], idx));
+    expect(feature?.points).toHaveLength(3); // stop, hotel, next day's stop
+  });
+
+  it('gives a leg with only a stay a circle at the stay', () => {
+    const days = daysWithStops(3, 0);
+    const idx = buildDayIndex(days);
+
+    const [feature] = buildFeatures(resolveAll([row(1, 1, 3)], idx), days, buildNightStops([stay(1, 1000, 1003)], idx));
+    expect(feature).toMatchObject({ type: 'circle', center: HOTEL });
+  });
+
+  it('still fits every host budget once stays are threaded in', () => {
+    const days = daysWithStops(200, 50);
+    const idx = buildDayIndex(days);
+    const rows = Array.from({ length: MAX_SEGMENTS_PER_TRIP }, (_, i) => row(i + 1, i * 5 + 1, i * 5 + 5));
+    const nights = buildNightStops([stay(1, 1000, 1199)], idx);
+
+    const features = buildFeatures(resolveAll(rows, idx), days, nights);
+    expect(vertexCount(features)).toBeLessThanOrEqual(HOST_MAX_VERTICES);
+    expect(features).toHaveLength(MAX_SEGMENTS_PER_TRIP);
+  });
+
+  it('coerces the stored map-line mode, defaulting to stops and stays', () => {
+    for (const mode of ['with-stays', 'stops-only', 'off'] as const) expect(coerceMapLineMode(mode)).toBe(mode);
+    for (const junk of [undefined, null, '', 'on', 1]) expect(coerceMapLineMode(junk)).toBe(DEFAULT_MAP_LINE_MODE);
+    expect(DEFAULT_MAP_LINE_MODE).toBe('with-stays');
   });
 });
 
