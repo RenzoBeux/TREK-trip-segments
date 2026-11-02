@@ -610,27 +610,29 @@ html[data-fill] body.trek-ui {
 }
 [data-form-factor=phone] .seg-legend {
   position: sticky;
-  top: -1px;
+  top: 8px;
   z-index: 20;
   flex-wrap: nowrap;
   max-height: none;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  margin: -9px -16px -8px;
-  padding: 9px 16px 8px;
-}
-[data-form-factor=phone] .seg-legend--stuck {
-  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 0 var(--border-faint);
+  padding: 5px;
+  border: 1px solid var(--m-gbr, var(--glass-border, var(--border-faint)));
+  border-radius: 999px;
+  background: var(--m-glass, var(--glass-bg, var(--bg-primary)));
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
 }
 [data-form-factor=phone] .seg-legend::-webkit-scrollbar {
   display: none;
 }
 [data-form-factor=phone] .seg-legend-item {
   flex: none;
+  background: var(--m-card, var(--bg-card));
+}
+[data-form-factor=phone] .seg-legend-item--on {
+  background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--m-card, var(--bg-card));
 }
 [data-form-factor=phone] .seg-panel-slot {
   background: var(--m-card, var(--bg-card));
@@ -1756,7 +1758,6 @@ html[data-fill] body.trek-ui {
     };
     const top = el("div", { class: "seg-top" }, [regions.strip, regions.header, regions.legend]);
     watchStuck(top, "seg-top--stuck");
-    watchStuck(regions.legend, "seg-legend--stuck");
     root.append(regions.banner, top, regions.editor, regions.body, regions.panel);
   }
   function watchStuck(node, stuckClass) {

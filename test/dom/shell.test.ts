@@ -52,20 +52,12 @@ describe('the pinned top of the tab', () => {
     const root = document.createElement('div');
     mountShell(root, actions);
     const top = root.querySelector('.seg-top')!;
-    const legend = root.querySelector('.seg-legend')!;
 
     reports.get(top)!([{ boundingClientRect: { top: -1 } }]);
     expect(top.classList.contains('seg-top--stuck')).toBe(true);
 
     reports.get(top)!([{ boundingClientRect: { top: 19 } }]);
     expect(top.classList.contains('seg-top--stuck')).toBe(false);
-
-    // Cut off at the bottom of a short screen is not pinned.
-    reports.get(legend)!([{ boundingClientRect: { top: 430 } }]);
-    expect(legend.classList.contains('seg-legend--stuck')).toBe(false);
-
-    reports.get(legend)!([{ boundingClientRect: { top: -1 } }]);
-    expect(legend.classList.contains('seg-legend--stuck')).toBe(true);
   });
 
   it('still mounts where IntersectionObserver does not exist', () => {

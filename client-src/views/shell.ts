@@ -58,9 +58,9 @@ export function mountShell(root: HTMLElement, shellActions: ShellActions): void 
   // The strip, header and legend are the only key to what each colour means, so
   // they stay pinned while a long trip's months scroll underneath them.
   const top = el('div', { class: 'seg-top' }, [regions.strip, regions.header, regions.legend]);
+  // On a phone only the legend pins (the block is display: contents there), in
+  // a tray that is always drawn, so it needs no watcher.
   watchStuck(top, 'seg-top--stuck');
-  // On a phone only the legend pins (the block is display: contents there).
-  watchStuck(regions.legend, 'seg-legend--stuck');
 
   root.append(regions.banner, top, regions.editor, regions.body, regions.panel);
 }

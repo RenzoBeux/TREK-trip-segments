@@ -799,30 +799,31 @@ html[data-fill] body.trek-ui {
 /* On a phone the whole pinned block — a 58px strip, a header that wraps to two
    rows and a wrapping legend — would hold a third of the screen. So there the
    block dissolves (display: contents puts its children back in the page) and
-   only the legend pins, as a single row that scrolls sideways, with the same
-   backing-only-while-pinned rule as the desktop block. */
+   only the legend pins, as a single row that scrolls sideways.
+   It sits in a frosted tray at all times, not only while pinned: chips over
+   the calendar are hard to read, the phone page is a gradient a flat band
+   would clash with, and a tray that is always there cannot fail to appear.
+   The tray is the kit's own phone glass (the .trek-glass recipe) and each chip
+   gets the card surface on top, so the names stay legible over any day. */
 [data-form-factor='phone'] .seg-top {
   display: contents;
 }
 
 [data-form-factor='phone'] .seg-legend {
   position: sticky;
-  top: -1px;
+  top: 8px;
   z-index: 20;
   flex-wrap: nowrap;
   max-height: none;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  margin: -9px -16px -8px;
-  padding: 9px 16px 8px;
-}
-
-[data-form-factor='phone'] .seg-legend--stuck {
-  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 1px 0 var(--border-faint);
+  padding: 5px;
+  border: 1px solid var(--m-gbr, var(--glass-border, var(--border-faint)));
+  border-radius: 999px;
+  background: var(--m-glass, var(--glass-bg, var(--bg-primary)));
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
 }
 
 [data-form-factor='phone'] .seg-legend::-webkit-scrollbar {
@@ -831,6 +832,13 @@ html[data-fill] body.trek-ui {
 
 [data-form-factor='phone'] .seg-legend-item {
   flex: none;
+  background: var(--m-card, var(--bg-card));
+}
+
+/* The rule above outranks .seg-legend-item--on, so restate its tint, layered
+   over the card so the selected chip stays as opaque as the rest. */
+[data-form-factor='phone'] .seg-legend-item--on {
+  background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--m-card, var(--bg-card));
 }
 
 /* The kit drops the shadow from .trek-card on the phone — a drop shadow over
