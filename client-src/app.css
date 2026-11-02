@@ -188,7 +188,14 @@ html[data-fill] body.trek-ui {
 
 /* --- editor --------------------------------------------------------------- */
 
+/* The editor is a .trek-glass, and backdrop-filter (plus the modal-enter
+   animation's transform) makes it a stacking context. The kit's select menu
+   (z-index 50) is then trapped inside it, and the leg cards rendered after the
+   editor — also glass, also stacking contexts — paint over the open dropdown
+   (#4). Lifting the editor's own context above its later siblings fixes it. */
 .seg-editor {
+  position: relative;
+  z-index: 10;
   padding: 16px;
 }
 
