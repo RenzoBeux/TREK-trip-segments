@@ -53,6 +53,22 @@ html[data-fill] body.trek-ui {
   background: var(--info-soft);
   color: var(--info);
 }
+.seg-top {
+  position: sticky;
+  top: -1px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: -9px -16px -8px;
+  padding: 9px 16px 8px;
+}
+.seg-top--stuck {
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--border-faint);
+}
 .seg-strip:empty {
   display: none;
 }
@@ -351,6 +367,8 @@ html[data-fill] body.trek-ui {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  max-height: 96px;
+  overflow-y: auto;
 }
 .seg-legend:empty {
   display: none;
@@ -586,6 +604,33 @@ html[data-fill] body.trek-ui {
 }
 [data-form-factor=phone] .seg-cal-cell--in:active {
   filter: brightness(1.06);
+}
+[data-form-factor=phone] .seg-top {
+  display: contents;
+}
+[data-form-factor=phone] .seg-legend {
+  position: sticky;
+  top: -1px;
+  z-index: 20;
+  flex-wrap: nowrap;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  margin: -9px -16px -8px;
+  padding: 9px 16px 8px;
+}
+[data-form-factor=phone] .seg-legend--stuck {
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--border-faint);
+}
+[data-form-factor=phone] .seg-legend::-webkit-scrollbar {
+  display: none;
+}
+[data-form-factor=phone] .seg-legend-item {
+  flex: none;
 }
 [data-form-factor=phone] .seg-panel-slot {
   background: var(--m-card, var(--bg-card));
@@ -1709,15 +1754,19 @@ html[data-fill] body.trek-ui {
       // Only used by the calendar; the list embeds the panel inside its card.
       panel: el("div", { class: "seg-panel-slot" })
     };
-    root.append(
-      regions.banner,
-      regions.strip,
-      regions.header,
-      regions.legend,
-      regions.editor,
-      regions.body,
-      regions.panel
-    );
+    const top = el("div", { class: "seg-top" }, [regions.strip, regions.header, regions.legend]);
+    watchStuck(top, "seg-top--stuck");
+    watchStuck(regions.legend, "seg-legend--stuck");
+    root.append(regions.banner, top, regions.editor, regions.body, regions.panel);
+  }
+  function watchStuck(node, stuckClass) {
+    if (typeof IntersectionObserver === "undefined") return;
+    new IntersectionObserver(
+      ([entry]) => {
+        if (entry) node.classList.toggle(stuckClass, entry.boundingClientRect.top < 0);
+      },
+      { threshold: [1] }
+    ).observe(node);
   }
   function viewToggle(current, onSet) {
     const tab = (mode, label) => el("button", {

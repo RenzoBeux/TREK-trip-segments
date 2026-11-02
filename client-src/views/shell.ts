@@ -55,15 +55,34 @@ export function mountShell(root: HTMLElement, shellActions: ShellActions): void 
     panel: el('div', { class: 'seg-panel-slot' }),
   };
 
-  root.append(
-    regions.banner,
-    regions.strip,
-    regions.header,
-    regions.legend,
-    regions.editor,
-    regions.body,
-    regions.panel,
-  );
+  // The strip, header and legend are the only key to what each colour means, so
+  // they stay pinned while a long trip's months scroll underneath them.
+  const top = el('div', { class: 'seg-top' }, [regions.strip, regions.header, regions.legend]);
+  watchStuck(top, 'seg-top--stuck');
+  // On a phone only the legend pins (the block is display: contents there).
+  watchStuck(regions.legend, 'seg-legend--stuck');
+
+  root.append(regions.banner, top, regions.editor, regions.body, regions.panel);
+}
+
+/**
+ * Mark a pinned element while it is actually pinned, so its backing and hairline
+ * appear only once content is scrolling beneath it and the resting layout looks
+ * exactly as it did before.
+ *
+ * Pinned elements sit at `top: -1px`, so pinned they poke one pixel above the
+ * frame: crossing full visibility fires the observer, and a negative top says it
+ * was the top edge — not a block merely cut off at the bottom of a short screen.
+ * Missing in jsdom, where nothing ever reads as stuck.
+ */
+function watchStuck(node: HTMLElement, stuckClass: string): void {
+  if (typeof IntersectionObserver === 'undefined') return;
+  new IntersectionObserver(
+    ([entry]) => {
+      if (entry) node.classList.toggle(stuckClass, entry.boundingClientRect.top < 0);
+    },
+    { threshold: [1] },
+  ).observe(node);
 }
 
 function viewToggle(current: ViewMode, onSet: (v: ViewMode) => void): HTMLElement {

@@ -74,6 +74,40 @@ html[data-fill] body.trek-ui {
   color: var(--info);
 }
 
+/* --- pinned top ------------------------------------------------------------ */
+
+/* Strip + header + legend stay put while the months scroll, because the legend
+   is the only key to the colours and it used to scroll away after the first
+   month. The document is the scroller (see html[data-fill] above), so sticky
+   needs no height chain.
+
+   The negative margins cancel the padding, so at rest the block occupies
+   exactly the space the three regions did; the padding only shows once pinned,
+   as breathing room between the frame edge and the strip. `top: -1px` is what
+   lets watchStuck() tell pinned from resting.
+
+   Body background is transparent (the host page shows through, a gradient on
+   phones), so the pinned block brings its own frosted backing — mostly the
+   page colour, blurred, rather than a hard slab. Only while pinned, so the
+   resting page is unchanged. z-index 20 clears the open editor (10). */
+.seg-top {
+  position: sticky;
+  top: -1px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: -9px -16px -8px;
+  padding: 9px 16px 8px;
+}
+
+.seg-top--stuck {
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--border-faint);
+}
+
 /* --- day strip ------------------------------------------------------------ */
 
 .seg-strip:empty {
@@ -441,6 +475,10 @@ html[data-fill] body.trek-ui {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* Pinned, a 40-leg legend would wrap to six rows and bury the calendar, so
+     it stops at three (28px chips, 6px gaps) and scrolls inside after that. */
+  max-height: 96px;
+  overflow-y: auto;
 }
 
 .seg-legend:empty {
@@ -756,6 +794,43 @@ html[data-fill] body.trek-ui {
 
 [data-form-factor='phone'] .seg-cal-cell--in:active {
   filter: brightness(1.06);
+}
+
+/* On a phone the whole pinned block — a 58px strip, a header that wraps to two
+   rows and a wrapping legend — would hold a third of the screen. So there the
+   block dissolves (display: contents puts its children back in the page) and
+   only the legend pins, as a single row that scrolls sideways, with the same
+   backing-only-while-pinned rule as the desktop block. */
+[data-form-factor='phone'] .seg-top {
+  display: contents;
+}
+
+[data-form-factor='phone'] .seg-legend {
+  position: sticky;
+  top: -1px;
+  z-index: 20;
+  flex-wrap: nowrap;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  margin: -9px -16px -8px;
+  padding: 9px 16px 8px;
+}
+
+[data-form-factor='phone'] .seg-legend--stuck {
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--border-faint);
+}
+
+[data-form-factor='phone'] .seg-legend::-webkit-scrollbar {
+  display: none;
+}
+
+[data-form-factor='phone'] .seg-legend-item {
+  flex: none;
 }
 
 /* The kit drops the shadow from .trek-card on the phone — a drop shadow over
