@@ -1,10 +1,10 @@
 {
   "id": "trip-segments",
   "name": "Trip Segments",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "apiVersion": 1,
   "type": "trip-page",
-  "trek": ">=4.0.0 <5.0.0",
+  "trek": ">=4.0.0 <6.0.0",
   "author": "Renzo Beux",
   "description": "Split long multi-destination trips into colour-coded legs, with a per-leg view of the schedule, bookings and stays.",
   "homepage": "https://github.com/RenzoBeux/TREK-trip-segments",

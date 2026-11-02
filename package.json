@@ -1,6 +1,6 @@
 {
   "name": "trek-plugin-trip-segments",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "type": "commonjs",
   "description": "Split long multi-destination TREK trips into colour-coded legs.",
@@ -22,7 +22,7 @@
     "esbuild": "^0.25.0",
     "jsdom": "^29.1.1",
     "playwright": "^1.62.0",
-    "trek-plugin-sdk": "^1.6.0",
+    "trek-plugin-sdk": "^1.7.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }
