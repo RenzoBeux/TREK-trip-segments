@@ -91,7 +91,7 @@ deleting removes only the segment, never the trip days, bookings or stays inside
 
 ## Setup
 
-Trip Segments 1.3.0 requires **TREK 4.0.0 or newer**; on an older instance the registry keeps serving
+Trip Segments 1.3.1 requires **TREK 4.0.0 or newer** (TREK 5 included); on an older instance the registry keeps serving
 1.1.0 instead. Install from the registry or sideload the packed zip, then activate it in Admin →
 Plugins and approve the permissions listed above. No API keys and no external services are
 contacted; the one setting is described below and has a working default.
