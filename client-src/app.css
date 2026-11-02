@@ -24,7 +24,7 @@ body {
    The kit's own answer is the opt-in .trek-scroll inner scroller, which needs a
    full height chain. Restoring the document scroll is smaller, keeps one scroll
    context, and leaves the height report that sizes /preview alone. Specificity
-   (0,2,2) beats the kit's (0,2,1); app.css is also linked after the kit, so it
+   (0,2,2) beats the kit's (0,2,1); app.css is also inlined after the kit, so it
    would win a tie too. Scoped to [data-fill], so /preview is untouched. */
 html[data-fill] body.trek-ui {
   overflow-y: auto;
