@@ -10,6 +10,6 @@ coverage/
 *.tsbuildinfo
 .DS_Store
 
-# NOTE: server/index.js, client/app.js and client/app.css are BUILD OUTPUT but are
-# deliberately COMMITTED — `trek-plugin pack` and `validate` walk the working tree
+# NOTE: server/index.js and client/index.html (CSS and JS inlined from client-src/)
+# are BUILD OUTPUT but are deliberately COMMITTED — `trek-plugin pack` and `validate` walk the working tree
 # and require them on disk. `npm run verify` fails if they drift from source.

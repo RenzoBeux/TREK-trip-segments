@@ -963,6 +963,10 @@ var DEFAULT_TINT_MODE = "header-badge";
 function coerceTintMode(value) {
   return value === "full-day" || value === "header-badge" || value === "badge-only" || value === "off" ? value : DEFAULT_TINT_MODE;
 }
+var DEFAULT_MAP_LINE_MODE = "with-stays";
+function coerceMapLineMode(value) {
+  return value === "with-stays" || value === "stops-only" || value === "off" ? value : DEFAULT_MAP_LINE_MODE;
+}
 
 // src/server/hooks/day-tint.ts
 function buildTints(views, idx, mode = DEFAULT_TINT_MODE) {
@@ -1054,7 +1058,18 @@ function allocateBudget(counts, total, perFeature) {
 }
 
 // src/server/hooks/map-layer.ts
-function legPoints(days, start, end) {
+function buildNightStops(accommodations, idx) {
+  const stays = dedupeAccommodations(accommodations).map((stay) => ({ stay, span: accommodationSpan(stay, idx) })).filter((s) => s.span !== null && isFiniteLatLng(s.stay.place_lat, s.stay.place_lng)).sort((a, b) => a.span.lo - b.span.lo || a.stay.id - b.stay.id);
+  const nights = /* @__PURE__ */ new Map();
+  for (const { stay, span } of stays) {
+    const lastNight = Math.max(span.lo, span.hi - 1);
+    for (let pos = span.lo; pos <= lastNight; pos++) {
+      if (!nights.has(pos)) nights.set(pos, [stay.place_lat, stay.place_lng]);
+    }
+  }
+  return nights;
+}
+function legPoints(days, start, end, nights) {
   const raw = [];
   for (let pos = start; pos <= end; pos++) {
     const day = days[pos - 1];
@@ -1062,14 +1077,16 @@ function legPoints(days, start, end) {
     for (const assignment of day.assignments ?? []) {
       raw.push([assignment.place?.lat, assignment.place?.lng]);
     }
+    const stay = nights.get(pos);
+    if (stay) raw.push(stay);
   }
   return raw;
 }
-function buildFeatures(views, days) {
+function buildFeatures(views, days, nights = /* @__PURE__ */ new Map()) {
   const live = [];
   for (const view of views) {
     if (view.effStart === null || view.effEnd === null) continue;
-    live.push({ view, path: cleanPath(legPoints(days, view.effStart, view.effEnd)) });
+    live.push({ view, path: cleanPath(legPoints(days, view.effStart, view.effEnd, nights)) });
   }
   const allowance = allocateBudget(
     live.map((l) => l.path.length),
@@ -1107,13 +1124,26 @@ function buildFeatures(views, days) {
   });
   return features;
 }
+async function readMapLineMode(ctx) {
+  try {
+    return coerceMapLineMode(await ctx.settings?.get("mapLines"));
+  } catch {
+    return DEFAULT_MAP_LINE_MODE;
+  }
+}
 async function getLayers(tripId, ctx) {
   try {
     await ensureSchema(ctx);
     const rows2 = await listSegments(ctx, tripId);
     if (rows2.length === 0) return [];
-    const days = await ctx.trips.getDays(tripId);
-    const features = buildFeatures(resolveAll(rows2, buildDayIndex(days)), days);
+    const mode = await readMapLineMode(ctx);
+    if (mode === "off") return [];
+    const [days, accommodations] = await Promise.all([
+      ctx.trips.getDays(tripId),
+      mode === "with-stays" ? ctx.trips.getAccommodations(tripId) : Promise.resolve([])
+    ]);
+    const idx = buildDayIndex(days);
+    const features = buildFeatures(resolveAll(rows2, idx), days, buildNightStops(accommodations, idx));
     if (features.length === 0) return [];
     return [{ id: "segments", name: "Trip segments", features }];
   } catch (err) {

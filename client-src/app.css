@@ -24,7 +24,7 @@ body {
    The kit's own answer is the opt-in .trek-scroll inner scroller, which needs a
    full height chain. Restoring the document scroll is smaller, keeps one scroll
    context, and leaves the height report that sizes /preview alone. Specificity
-   (0,2,2) beats the kit's (0,2,1); app.css is also linked after the kit, so it
+   (0,2,2) beats the kit's (0,2,1); app.css is also inlined after the kit, so it
    would win a tie too. Scoped to [data-fill], so /preview is untouched. */
 html[data-fill] body.trek-ui {
   overflow-y: auto;
@@ -72,6 +72,40 @@ html[data-fill] body.trek-ui {
 .seg-banner--info {
   background: var(--info-soft);
   color: var(--info);
+}
+
+/* --- pinned top ------------------------------------------------------------ */
+
+/* Strip + header + legend stay put while the months scroll, because the legend
+   is the only key to the colours and it used to scroll away after the first
+   month. The document is the scroller (see html[data-fill] above), so sticky
+   needs no height chain.
+
+   The negative margins cancel the padding, so at rest the block occupies
+   exactly the space the three regions did; the padding only shows once pinned,
+   as breathing room between the frame edge and the strip. `top: -1px` is what
+   lets watchStuck() tell pinned from resting.
+
+   Body background is transparent (the host page shows through, a gradient on
+   phones), so the pinned block brings its own frosted backing — mostly the
+   page colour, blurred, rather than a hard slab. Only while pinned, so the
+   resting page is unchanged. z-index 20 clears the open editor (10). */
+.seg-top {
+  position: sticky;
+  top: -1px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: -9px -16px -8px;
+  padding: 9px 16px 8px;
+}
+
+.seg-top--stuck {
+  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 0 var(--border-faint);
 }
 
 /* --- day strip ------------------------------------------------------------ */
@@ -188,7 +222,14 @@ html[data-fill] body.trek-ui {
 
 /* --- editor --------------------------------------------------------------- */
 
+/* The editor is a .trek-glass, and backdrop-filter (plus the modal-enter
+   animation's transform) makes it a stacking context. The kit's select menu
+   (z-index 50) is then trapped inside it, and the leg cards rendered after the
+   editor — also glass, also stacking contexts — paint over the open dropdown
+   (#4). Lifting the editor's own context above its later siblings fixes it. */
 .seg-editor {
+  position: relative;
+  z-index: 10;
   padding: 16px;
 }
 
@@ -434,6 +475,10 @@ html[data-fill] body.trek-ui {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* Pinned, a 40-leg legend would wrap to six rows and bury the calendar, so
+     it stops at three (28px chips, 6px gaps) and scrolls inside after that. */
+  max-height: 96px;
+  overflow-y: auto;
 }
 
 .seg-legend:empty {
@@ -749,6 +794,51 @@ html[data-fill] body.trek-ui {
 
 [data-form-factor='phone'] .seg-cal-cell--in:active {
   filter: brightness(1.06);
+}
+
+/* On a phone the whole pinned block — a 58px strip, a header that wraps to two
+   rows and a wrapping legend — would hold a third of the screen. So there the
+   block dissolves (display: contents puts its children back in the page) and
+   only the legend pins, as a single row that scrolls sideways.
+   It sits in a frosted tray at all times, not only while pinned: chips over
+   the calendar are hard to read, the phone page is a gradient a flat band
+   would clash with, and a tray that is always there cannot fail to appear.
+   The tray is the kit's own phone glass (the .trek-glass recipe) and each chip
+   gets the card surface on top, so the names stay legible over any day. */
+[data-form-factor='phone'] .seg-top {
+  display: contents;
+}
+
+[data-form-factor='phone'] .seg-legend {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  flex-wrap: nowrap;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding: 5px;
+  border: 1px solid var(--m-gbr, var(--glass-border, var(--border-faint)));
+  border-radius: 999px;
+  background: var(--m-glass, var(--glass-bg, var(--bg-primary)));
+  -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  backdrop-filter: blur(30px) saturate(1.8);
+}
+
+[data-form-factor='phone'] .seg-legend::-webkit-scrollbar {
+  display: none;
+}
+
+[data-form-factor='phone'] .seg-legend-item {
+  flex: none;
+  background: var(--m-card, var(--bg-card));
+}
+
+/* The rule above outranks .seg-legend-item--on, so restate its tint, layered
+   over the card so the selected chip stays as opaque as the rest. */
+[data-form-factor='phone'] .seg-legend-item--on {
+  background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--m-card, var(--bg-card));
 }
 
 /* The kit drops the shadow from .trek-card on the phone — a drop shadow over

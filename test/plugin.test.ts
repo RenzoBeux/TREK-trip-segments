@@ -51,6 +51,15 @@ describe('manifest and code agree', () => {
     expect(field?.options?.map((o) => o.value)).toEqual(['full-day', 'header-badge', 'badge-only', 'off']);
   });
 
+  it('declares the map-lines setting as a per-user select', () => {
+    const field = manifest.settings?.find((s) => s.key === 'mapLines');
+
+    expect(field).toBeDefined();
+    expect(field?.scope).toBe('user');
+    expect(field?.input_type).toBe('select');
+    expect(field?.options?.map((o) => o.value)).toEqual(['with-stays', 'stops-only', 'off']);
+  });
+
   it('declares db:own and db:read:trips, which every route depends on', () => {
     expect(manifest.permissions).toContain('db:own');
     expect(manifest.permissions).toContain('db:read:trips');
@@ -194,6 +203,50 @@ describe('provider hooks the host can actually reach', () => {
       const [tint] = await tints({ tintMode: 'whole-day' });
 
       expect(tint).toMatchObject({ headerColor: '#4F46E5', badgeColor: '#4F46E5' });
+    });
+  });
+
+  describe('the map-lines setting (#3, #6)', () => {
+    const HOTEL = [35.0, 135.75];
+    const located = makeDays(12, { startDate: '2026-04-10' }).map((day, i) => ({
+      ...day,
+      assignments: [{ id: i, day_id: day.id, place_id: i, order_index: 0, place: { id: i, name: `Stop ${i}`, lat: 34 + i * 0.01, lng: 135 } }],
+    }));
+
+    const layers = (userSettings: Record<string, unknown>) =>
+      createMockHost({
+        actingUserId: 1,
+        grants: manifest.permissions,
+        userSettings,
+        trips: {
+          1: {
+            members: [1],
+            data: { id: 1, title: 'Japan' },
+            days: located,
+            reservations: [],
+            // Kyoto (days 5-8): a hotel for the nights of days 5, 6 and 7.
+            accommodations: [{ id: 1, trip_id: 1, start_day_id: 105, end_day_id: 108, place_lat: HOTEL[0], place_lng: HOTEL[1] }],
+          },
+        },
+        queryResults: { [SQL_LIST]: SEGMENTS },
+      })
+        .run(asSdkPlugin(plugin))
+        .hook<Array<{ features: Array<{ points?: number[][] }> }>>('mapLayerProvider', 'getLayers', 1);
+
+    it('threads each night\'s stay into the line by default', async () => {
+      const [layer] = await layers({});
+      // Kyoto: 4 stops plus the hotel after each of its first three days.
+      expect(layer?.features[1]?.points).toHaveLength(7);
+      expect(layer?.features[1]?.points?.[1]).toEqual(HOTEL);
+    });
+
+    it('follows the planned stops alone when asked to', async () => {
+      const [layer] = await layers({ mapLines: 'stops-only' });
+      expect(layer?.features[1]?.points).toHaveLength(4);
+    });
+
+    it('draws nothing when the user turned the lines off', async () => {
+      expect(await layers({ mapLines: 'off' })).toEqual([]);
     });
   });
 

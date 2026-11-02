@@ -49,7 +49,7 @@ four semantic tones, because neither hook carries a colour channel of its own.
 | `ws:broadcast:trip` | Notifies other people looking at the same trip that the legs changed, so their tab refreshes without a reload. |
 | `hook:day-schedule-provider` | Puts the small start/end banner for each leg on the day plan. |
 | `hook:day-tint-provider` | Tints the day in the leg's own colour. Which parts of it — header, badge, the whole day, or none — is a per-user setting. |
-| `hook:map-layer-provider` | Draws one coloured line per leg on the trip map. |
+| `hook:map-layer-provider` | Draws one coloured line per leg on the trip map. What it connects, or whether it is drawn at all, is a per-user setting. |
 | `hook:pdf-section-provider` | Adds the leg summary section to the trip's PDF export. |
 | `hook:trip-card-provider` | Adds the leg-count badge to the trip card on the dashboard. |
 
@@ -58,8 +58,9 @@ numbers, so there is no user data to export or erase.
 
 ## Settings
 
-One setting, **Day tint**, under Settings → Plugins. It chooses how much of a day the leg colour
-covers:
+Two settings, under Settings → Plugins.
+
+**Day tint** chooses how much of a day the leg colour covers:
 
 | Option | What it paints |
 | --- | --- |
@@ -78,6 +79,19 @@ carries a tint, so the first three options look the same there; only **No tint**
 
 The default matches what 1.2.0 did, so upgrading changes nothing until you pick something else.
 
+**Map lines** chooses what each leg's line on the trip map connects:
+
+| Option | What the line follows |
+| --- | --- |
+| Stops and each night's stay *(default)* | Every planned stop in visiting order, returning to the night's accommodation at the end of each day |
+| Planned stops only | Every planned stop in visiting order, ignoring accommodation |
+| No lines | Nothing — the plugin adds no layer to the map |
+
+The default means a leg based in one city with day trips out of it reads as spokes from the hotel,
+without having to add the hotel to the end of every day by hand. The lines are straight, stop to stop:
+they show the order of the leg, not a route. Like the day tint, the map reads them when it loads, so
+a change shows the next time you open a trip.
+
 ## MCP tools
 
 The plugin declares tools to list, inspect, create, update and delete trip segments. Read this section
@@ -94,7 +108,7 @@ deleting removes only the segment, never the trip days, bookings or stays inside
 Trip Segments 1.3.1 requires **TREK 4.0.0 or newer** (TREK 5 included); on an older instance the registry keeps serving
 1.1.0 instead. Install from the registry or sideload the packed zip, then activate it in Admin →
 Plugins and approve the permissions listed above. No API keys and no external services are
-contacted; the one setting is described below and has a working default.
+contacted; both settings are described below and have working defaults.
 
 Open any trip and you will find a Segments tab immediately after Plan; it is also addressable
 directly as `?tab=plugin:trip-segments`, so it can be a bookmark or a startup destination. Use Add leg to draw your

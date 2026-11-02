@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trip Segments</title>
+    <!--
+      Template for client/index.html — build.mjs replaces the two seg: markers
+      with the bundled CSS and JS, inlined, so the shipped page loads no
+      subresources at all (see the header comment in build.mjs for why).
+
+      The trek:ui marker is expanded by `trek-plugin pack` and `trek-plugin dev`
+      into the TREK design kit (CSS + the window.trek bridge). It must come
+      BEFORE our script runs and BEFORE our styles, so our own rules win on ties.
+    -->
+    <!-- trek:ui -->
+    <!-- seg:app-css -->
+  </head>
+  <body>
+    <div id="seg-root"></div>
+    <!-- seg:app-js -->
+  </body>
+</html>
