@@ -901,6 +901,23 @@ var mcpTools = [
     handler: (input, ctx) => invoke("DELETE", "/segments", input, ctx)
   }
 ];
+var mcpToolDeclarations = mcpTools.map(({ handler: _handler, ...declaration }) => declaration);
+function isPlainObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function errorResult(payload) {
+  return { content: [{ type: "text", text: JSON.stringify(payload) }], isError: true };
+}
+var mcpToolProvider = {
+  tools: mcpTools.map((tool) => tool.name),
+  async callTool({ name, args }, ctx) {
+    const tool = mcpTools.find((candidate) => candidate.name === name);
+    if (!tool) return errorResult({ ok: false, error: "unknown_tool", detail: name });
+    if (!isPlainObject(args)) return errorResult({ ok: false, error: "bad_request", detail: "arguments must be an object" });
+    const result = await tool.handler(args, ctx);
+    return result.ok === false ? errorResult(result) : result;
+  }
+};
 
 // src/server/hooks/day-schedule.ts
 function liveSegments(views) {
@@ -1265,24 +1282,21 @@ var plugin = {
   },
   routes,
   /**
-   * Inert. No released TREK reads `mcpTools`, 4.0.0 included. An unknown
-   * definition key costs nothing, so the declarations stay ready rather than
-   * being deleted now and rewritten later — see PluginMcpTool in
-   * shared/host-types.ts for what is and is not known about the shape.
-   */
-  mcpTools,
-  /**
-   * Each of these needs its matching `hook:*` permission in trek-plugin.json.
-   * Without it the plugin still installs and activates, and the hook is simply
-   * never called — no error, no log, nothing. test/plugin.test.ts asserts the
-   * two lists agree, with no exceptions: all five are granted as of 1.2.0.
+   * Each of these needs its matching permission in trek-plugin.json — `hook:*`,
+   * or `mcp:tools` for mcpToolProvider. Without it the plugin still installs and
+   * activates, and the hook is simply never called — no error, no log, nothing.
+   * test/plugin.test.ts asserts the two lists agree, with no exceptions.
+   *
+   * mcpToolProvider also needs `capabilities.mcpTools` in the manifest: the host
+   * only advertises tools declared there, whatever this build reports.
    */
   hooks: {
     dayScheduleProvider: { getSchedule },
     dayTintProvider: { getDayTints },
     mapLayerProvider: { getLayers },
     pdfSectionProvider: { getSections },
-    tripCardProvider: { getCards }
+    tripCardProvider: { getCards },
+    mcpToolProvider
   }
 };
 var index_default = plugin;

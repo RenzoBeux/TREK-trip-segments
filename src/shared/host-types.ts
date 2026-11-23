@@ -412,35 +412,71 @@ export interface PluginHooks {
     /** Called ONCE with every visible, access-checked trip id (≤60). */
     getCards(tripIds: number[], ctx: PluginContext): Promise<TripCardContribution[]>;
   };
+
+  /**
+   * Plugin tools on TREK's own MCP server, since TREK 4.1.0. Gated by
+   * `mcp:tools` rather than a `hook:*` permission.
+   *
+   * Publishing takes BOTH halves. The host advertises the intersection of the
+   * signed manifest's `capabilities.mcpTools` (which carries the name,
+   * description, schema and annotations) and this `tools` list (which only says
+   * what this build implements). A name in one and not the other is ignored
+   * without a log line (contributions/plugin-mcp-tools.service.ts).
+   */
+  mcpToolProvider?: McpToolProvider;
 }
 
+// ---------------------------------------------------------------------------
+// MCP tools
+// ---------------------------------------------------------------------------
+
 /**
- * A tool contributed to TREK's MCP server.
+ * One entry of the manifest's `capabilities.mcpTools`, as install/manifest.ts
+ * parses it. At most 8 per plugin; names match /^[a-z0-9_]{1,48}$/ and are
+ * advertised as `plugin_<id>_<name>`.
  *
- * SPECULATIVE. No released TREK reads this key, 4.0.0 included — there is no
- * plugin-contributed MCP surface in the tree at all — so this shape is a guess
- * rather than a transcription of a host contract. TREK's own MCP tools are
- * compile-time Nest providers taking a Zod raw shape and returning an MCP
- * content envelope, which is not what is described here. Kept because an unknown
- * definition key is inert; re-derive it from the host before trusting it.
+ * The inputSchema is enforced by the host before `callTool` runs, and refused at
+ * install if it uses a keyword the host cannot enforce (mcp-tool-schema.ts):
+ * no `$ref`, `oneOf` or `anyOf`, and no `pattern` that quantifies a repeating group.
+ *
+ * Annotations are CLAMPED against the plugin's grants: any grant beyond reads
+ * and hooks (here, `ws:broadcast:trip`) forces `readOnlyHint` to false, so even
+ * the read tools are advertised as non-read-only.
  */
-export interface PluginMcpTool {
+export interface McpToolDeclaration {
   name: string;
+  title?: string;
   description: string;
-  inputSchema: Record<string, unknown>;
+  inputSchema?: Record<string, unknown>;
   annotations?: {
     readOnlyHint?: boolean;
     destructiveHint?: boolean;
     idempotentHint?: boolean;
     openWorldHint?: boolean;
   };
-  handler(input: Record<string, unknown>, ctx: PluginContext): Promise<unknown> | unknown;
+}
+
+/** The MCP result shape the host passes through as-is, `isError` included. */
+export interface McpTextResult {
+  content: Array<{ type: 'text'; text: string }>;
+  isError?: boolean;
+}
+
+/**
+ * plugin-host-entry.ts `invoke.hook`, 15s timeout. `name` is the plugin-local
+ * name, without the `plugin_<id>_` prefix. ctx is bound to the MCP caller, so
+ * ctx.trips membership checks apply exactly as they do on a route.
+ *
+ * Any other JSON value is serialised into a text block; a throw becomes a tool
+ * error whose message is clipped to 300 chars.
+ */
+export interface McpToolProvider {
+  tools: string[];
+  callTool(call: { name: string; args: unknown }, ctx: PluginContext): Promise<unknown>;
 }
 
 export interface PluginDefinition {
   onLoad?(ctx: PluginContext): Promise<void> | void;
   routes?: PluginRoute[];
   hooks?: PluginHooks;
-  /** Inert on every released TREK — see PluginMcpTool above. */
-  mcpTools?: PluginMcpTool[];
 }

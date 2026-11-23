@@ -27,8 +27,7 @@ few names.
 
 Three further integrations light up the rest of the planner: a small banner where each leg begins and
 ends on the day plan, one coloured line per leg on the trip map, and matching colour tints on day
-headers and badges. All three rest on provider hooks that TREK added in 4.0.0, which is why this
-release requires that version.
+headers and badges. All three rest on provider hooks that TREK added in 4.0.0.
 
 Choose from eight presets or use the custom colour picker. The Segments tab uses the exact hex colour,
 and the day tint keeps your hue and chroma while TREK clamps lightness into a band that stays readable
@@ -52,6 +51,7 @@ four semantic tones, because neither hook carries a colour channel of its own.
 | `hook:map-layer-provider` | Draws one coloured line per leg on the trip map. What it connects, or whether it is drawn at all, is a per-user setting. |
 | `hook:pdf-section-provider` | Adds the leg summary section to the trip's PDF export. |
 | `hook:trip-card-provider` | Adds the leg-count badge to the trip card on the dashboard. |
+| `mcp:tools` | Publishes the five segment tools below on TREK's MCP server, so an assistant can list and edit legs as the user it is connected for. |
 
 No personal data is stored. The plugin's database holds only trip ids, leg names, colours and day
 numbers, so there is no user data to export or erase.
@@ -94,19 +94,35 @@ a change shows the next time you open a trip.
 
 ## MCP tools
 
-The plugin declares tools to list, inspect, create, update and delete trip segments. Read this section
-as intent rather than as a shipped feature: **no released TREK exposes plugin-contributed MCP tools,
-4.0.0 included**, so nothing reads these declarations today and they change nothing about how the
-plugin behaves. They are kept so the feature is ready if host support lands.
+On TREK 4.1.0 and newer the plugin publishes five tools on TREK's own MCP server:
 
-Were a host to serve them, the handlers run as the calling user and go through the same membership
-checks, validation, overlap guards and live-update broadcast as changes made in the Segments tab, and
-deleting removes only the segment, never the trip days, bookings or stays inside it.
+| Tool | What it does |
+| --- | --- |
+| `list_trip_segments` | Lists a trip's legs and its ordered days |
+| `get_trip_segment` | One leg with the days, bookings and stays inside it |
+| `create_trip_segment` | Adds a leg over a range of days that no other leg covers |
+| `update_trip_segment` | Replaces a leg's name, colour and day range |
+| `delete_trip_segment` | Deletes a leg, and only the leg |
+
+TREK advertises them as `plugin_trip-segments_<tool>`. They run as the connected user and go through
+the same membership checks, validation, overlap guards and live-update broadcast as changes made in
+the Segments tab. Deleting removes only the segment, never the trip days, bookings or stays inside it.
+
+To see them in an assistant:
+
+1. An admin approves the `mcp:tools` permission when activating or updating the plugin.
+2. The assistant's OAuth client asks for the `plugins:use` scope. No preset in TREK's MCP settings
+   includes it, so it has to be added to the client by name. Static tokens already have it.
+3. Reconnect the assistant, or refresh its tool list, so it fetches the new tools.
+
+Clients that skip the approval prompt for read-only tools will still ask before the two read tools.
+TREK marks a plugin's tools read-only only when every grant the plugin holds is a read, and the
+broadcast permission (`ws:broadcast:trip`) counts as a write.
 
 ## Setup
 
-Trip Segments 1.3.1 requires **TREK 4.0.0 or newer** (TREK 5 included); on an older instance the registry keeps serving
-1.1.0 instead. Install from the registry or sideload the packed zip, then activate it in Admin →
+Trip Segments requires **TREK 4.1.0 or newer** (TREK 5 included); on an older instance the registry
+keeps serving an earlier release instead. Install from the registry or sideload the packed zip, then activate it in Admin →
 Plugins and approve the permissions listed above. No API keys and no external services are
 contacted; both settings are described below and have working defaults.
 

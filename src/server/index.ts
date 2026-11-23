@@ -1,6 +1,6 @@
 import { ensureSchema } from './schema';
 import { routes } from './routes';
-import { mcpTools } from './mcp-tools';
+import { mcpToolProvider } from './mcp-tools';
 import { getSchedule } from './hooks/day-schedule';
 import { getDayTints } from './hooks/day-tint';
 import { getLayers } from './hooks/map-layer';
@@ -30,19 +30,15 @@ const plugin: PluginDefinition = {
   },
 
   routes,
-  /**
-   * Inert. No released TREK reads `mcpTools`, 4.0.0 included. An unknown
-   * definition key costs nothing, so the declarations stay ready rather than
-   * being deleted now and rewritten later — see PluginMcpTool in
-   * shared/host-types.ts for what is and is not known about the shape.
-   */
-  mcpTools,
 
   /**
-   * Each of these needs its matching `hook:*` permission in trek-plugin.json.
-   * Without it the plugin still installs and activates, and the hook is simply
-   * never called — no error, no log, nothing. test/plugin.test.ts asserts the
-   * two lists agree, with no exceptions: all five are granted as of 1.2.0.
+   * Each of these needs its matching permission in trek-plugin.json — `hook:*`,
+   * or `mcp:tools` for mcpToolProvider. Without it the plugin still installs and
+   * activates, and the hook is simply never called — no error, no log, nothing.
+   * test/plugin.test.ts asserts the two lists agree, with no exceptions.
+   *
+   * mcpToolProvider also needs `capabilities.mcpTools` in the manifest: the host
+   * only advertises tools declared there, whatever this build reports.
    */
   hooks: {
     dayScheduleProvider: { getSchedule },
@@ -50,6 +46,7 @@ const plugin: PluginDefinition = {
     mapLayerProvider: { getLayers },
     pdfSectionProvider: { getSections },
     tripCardProvider: { getCards },
+    mcpToolProvider,
   },
 };
 

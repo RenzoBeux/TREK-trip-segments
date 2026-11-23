@@ -4,6 +4,7 @@ import { HOOK_PERMISSION, KNOWN_PERMISSIONS } from 'trek-plugin-sdk';
 import manifest from '../trek-plugin.json';
 import plugin from '../src/server/index';
 import { SQL_INSERT_IF_FREE, SQL_LIST } from '../src/server/repo';
+import { mcpToolDeclarations } from '../src/server/mcp-tools';
 import { makeDays } from './helpers';
 
 describe('manifest and code agree', () => {
@@ -32,7 +33,7 @@ describe('manifest and code agree', () => {
    */
   it('never ships a permission outside the TREK line it targets', () => {
     for (const permission of manifest.permissions) {
-      expect(KNOWN_PERMISSIONS, `${permission} is not a permission TREK 4 knows`).toContain(permission);
+      expect(KNOWN_PERMISSIONS, `${permission} is not a permission the targeted TREK knows`).toContain(permission);
     }
   });
 
@@ -272,23 +273,55 @@ describe('provider hooks the host can actually reach', () => {
 });
 
 describe('MCP tools', () => {
-  const tool = (name: string) => {
-    const found = plugin.mcpTools?.find((candidate) => candidate.name === name);
-    if (!found) throw new Error(`missing MCP tool ${name}`);
-    return found;
-  };
+  type McpResult = { content?: Array<{ type: string; text: string }>; isError?: boolean } & Record<string, unknown>;
+  const call = (host: ReturnType<typeof hostFor>, name: string, args: unknown) =>
+    host.run(asSdkPlugin(plugin)).hook('mcpToolProvider', 'callTool', { name, args }) as Promise<McpResult>;
+  const declared = () => manifest.capabilities.mcpTools;
+
+  /**
+   * TREK advertises the INTERSECTION of the manifest's capabilities.mcpTools and
+   * the hook's `tools` list, and drops the rest without a word. So the manifest
+   * entry must match the code exactly — a stale description or schema in
+   * trek-plugin.json is what the assistant would actually be shown.
+   */
+  it('declares in the manifest exactly the tools the code implements', () => {
+    expect(declared()).toEqual(mcpToolDeclarations);
+    expect(plugin.hooks?.mcpToolProvider?.tools).toEqual(declared().map((tool) => tool.name));
+  });
 
   it('declares a complete, collision-resistant segment tool set', () => {
-    expect(plugin.mcpTools?.map((candidate) => candidate.name)).toEqual([
+    expect(declared().map((tool) => tool.name)).toEqual([
       'list_trip_segments',
       'get_trip_segment',
       'create_trip_segment',
       'update_trip_segment',
       'delete_trip_segment',
     ]);
-    expect(tool('list_trip_segments').annotations?.readOnlyHint).toBe(true);
-    expect(tool('create_trip_segment').annotations?.readOnlyHint).toBe(false);
-    expect(tool('delete_trip_segment').annotations?.destructiveHint).toBe(true);
+    const byName = (name: string) => declared().find((tool) => tool.name === name);
+    expect(byName('list_trip_segments')?.annotations?.readOnlyHint).toBe(true);
+    expect(byName('create_trip_segment')?.annotations?.readOnlyHint).toBe(false);
+    expect(byName('delete_trip_segment')?.annotations?.destructiveHint).toBe(true);
+  });
+
+  /** On TREK 4.0.0 `mcp:tools` is an unknown permission, and an unknown permission fails the install. */
+  it('targets TREK 4.1.0 or newer, the first release that knows mcp:tools', () => {
+    expect(manifest.permissions).toContain('mcp:tools');
+    const floor = /^>=(\d+)\.(\d+)\.(\d+)\b/.exec(manifest.trek)?.slice(1).map(Number);
+    expect(floor, `unexpected trek range ${manifest.trek}`).toBeDefined();
+    const [major = 0, minor = 0] = floor ?? [];
+    expect(major > 4 || (major === 4 && minor >= 1), `trek range ${manifest.trek} admits 4.0.x`).toBe(true);
+  });
+
+  it('is never called without the mcp:tools grant', async () => {
+    const ungranted = createMockHost({
+      actingUserId: 1,
+      grants: manifest.permissions.filter((p) => p !== 'mcp:tools'),
+      trips: {},
+    });
+
+    await expect(
+      ungranted.run(asSdkPlugin(plugin)).hook('mcpToolProvider', 'callTool', { name: 'list_trip_segments', args: { tripId: 1 } }),
+    ).rejects.toThrow(/mcp:tools/);
   });
 
   it('uses the existing authenticated write path and broadcasts a successful MCP create', async () => {
@@ -297,21 +330,49 @@ describe('MCP tools', () => {
     ];
     const host = hostFor([1], { [SQL_INSERT_IF_FREE]: created });
 
-    const result = await tool('create_trip_segment').handler(
-      { tripId: 1, name: 'Tokyo', color: '#123abc', start_day: 1, end_day: 5 },
-      host.ctx as never,
-    );
+    const result = await call(host, 'create_trip_segment', { tripId: 1, name: 'Tokyo', color: '#123abc', start_day: 1, end_day: 5 });
 
+    expect(result.isError).toBeUndefined();
     expect(result).toMatchObject({ ok: true, segment: { id: 7, name: 'Tokyo', color: '#123ABC' } });
     expect(host.broadcasts).toHaveLength(1);
   });
 
-  it('does not let an MCP caller manage a trip they cannot access', async () => {
-    const host = hostFor([2]);
+  it('lists a trip the caller belongs to', async () => {
+    const result = await call(hostFor([1], { [SQL_LIST]: SEGMENTS }), 'list_trip_segments', { tripId: 1 });
 
-    const result = await tool('list_trip_segments').handler({ tripId: 1 }, host.ctx as never);
+    expect(result).toMatchObject({ ok: true, dayCount: 12 });
+    expect((result.segments as Array<{ name: string }>).map((s) => s.name)).toEqual(['Tokyo', 'Kyoto']);
+  });
 
-    expect(result).toMatchObject({ ok: false, status: 404, error: 'not_found' });
+  /**
+   * The host serialises whatever comes back into a SUCCESSFUL result unless it
+   * is flagged, so a refused call must carry isError or the model reads it as done.
+   */
+  it('reports a trip the caller cannot access as a tool error', async () => {
+    const result = await call(hostFor([2]), 'list_trip_segments', { tripId: 1 });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content?.[0]?.text ?? '')).toMatchObject({ ok: false, status: 404, error: 'not_found' });
+  });
+
+  it('reports a rejected write as a tool error, keeping the validation detail', async () => {
+    const result = await call(hostFor([1], { [SQL_LIST]: SEGMENTS }), 'create_trip_segment', {
+      tripId: 1,
+      name: 'Osaka',
+      color: '#123abc',
+      start_day: 3,
+      end_day: 6,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content?.[0]?.text ?? '')).toMatchObject({ ok: false });
+  });
+
+  it('answers an unknown tool or non-object arguments with a tool error, not a crash', async () => {
+    const host = hostFor([1]);
+
+    expect(await call(host, 'drop_everything', {})).toMatchObject({ isError: true });
+    expect(await call(host, 'list_trip_segments', null)).toMatchObject({ isError: true });
   });
 });
 

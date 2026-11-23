@@ -1,12 +1,25 @@
 import { MAX_TRIP_DAYS, NAME_MAX } from '../shared/limits';
 import { routes } from './routes';
 import type {
+  McpTextResult,
+  McpToolDeclaration,
+  McpToolProvider,
   PluginContext,
-  PluginMcpTool,
   PluginRequest,
   PluginResponse,
   PluginRoute,
 } from '../shared/host-types';
+
+/**
+ * A tool's manifest declaration plus the code that runs it. The declaration half
+ * is copied verbatim into trek-plugin.json `capabilities.mcpTools` — the host
+ * advertises what the SIGNED manifest says, not what this file says — and
+ * test/plugin.test.ts fails when the two drift.
+ */
+interface McpTool extends McpToolDeclaration {
+  inputSchema: Record<string, unknown>;
+  handler(input: Record<string, unknown>, ctx: PluginContext): Promise<Record<string, unknown>>;
+}
 
 const TRIP_ID = {
   type: 'integer',
@@ -112,7 +125,7 @@ async function invoke(
   return ok ? { ok: true, ...payload } : { ok: false, status: response.status, ...payload };
 }
 
-export const mcpTools: PluginMcpTool[] = [
+export const mcpTools: McpTool[] = [
   {
     name: 'list_trip_segments',
     description:
@@ -184,3 +197,35 @@ export const mcpTools: PluginMcpTool[] = [
     handler: (input, ctx) => invoke('DELETE', '/segments', input, ctx),
   },
 ];
+
+/** What trek-plugin.json `capabilities.mcpTools` must say, in this order. */
+export const mcpToolDeclarations: McpToolDeclaration[] = mcpTools.map(({ handler: _handler, ...declaration }) => declaration);
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function errorResult(payload: Record<string, unknown>): McpTextResult {
+  return { content: [{ type: 'text', text: JSON.stringify(payload) }], isError: true };
+}
+
+/**
+ * The hook TREK calls. A failed route call comes back as an MCP error result rather
+ * than a plain value: the host would otherwise serialise `{ ok: false, ... }`
+ * into a SUCCESSFUL result and the model would read a refused write as done.
+ * Returned rather than thrown so the validation detail survives intact — a thrown
+ * message is clipped to 300 chars.
+ */
+export const mcpToolProvider: McpToolProvider = {
+  tools: mcpTools.map((tool) => tool.name),
+  async callTool({ name, args }, ctx) {
+    const tool = mcpTools.find((candidate) => candidate.name === name);
+    if (!tool) return errorResult({ ok: false, error: 'unknown_tool', detail: name });
+    // The host has already validated args against the manifest schema; this only
+    // keeps a non-object from reaching Object.entries in invoke().
+    if (!isPlainObject(args)) return errorResult({ ok: false, error: 'bad_request', detail: 'arguments must be an object' });
+
+    const result = await tool.handler(args, ctx);
+    return result.ok === false ? errorResult(result) : result;
+  },
+};
